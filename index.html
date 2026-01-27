@@ -26,7 +26,6 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // 自定義圖標組件 (解決 React Error #130)
         const Icon = ({ children, size = 24, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
         );
@@ -56,6 +55,26 @@
             const [validationErrors, setValidationErrors] = useState([]);
             const [detectedEncoding, setDetectedEncoding] = useState('尚未偵測'); 
             const [validationStatus, setValidationStatus] = useState('idle');
+
+            // 強大的 CSV 解析器：可正確處理引號內的逗號
+            const parseCSVLine = (text) => {
+                const result = [];
+                let cell = '';
+                let inQuotes = false;
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        result.push(cell.trim());
+                        cell = '';
+                    } else {
+                        cell += char;
+                    }
+                }
+                result.push(cell.trim());
+                return result;
+            };
 
             const processZip = async (file, password) => {
                 if (!file) return;
@@ -104,9 +123,10 @@
                 const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
                 if (lines.length < 2) { setCsvData([]); return; }
 
-                const headers = lines[0].split(',').map(h => h.trim());
+                // 使用改良後的解析器
+                const headers = parseCSVLine(lines[0]);
                 const json = lines.slice(1).map(line => {
-                    const values = line.split(',').map(v => v.trim());
+                    const values = parseCSVLine(line);
                     return headers.reduce((obj, header, index) => {
                         obj[header] = values[index];
                         return obj;
@@ -123,7 +143,6 @@
                 setCsvData([]); setResults([]); setValidationStatus('idle'); setValidationErrors([]); setProgress(0);
             };
 
-            // 修正點：手動逐欄檢核
             const performValidation = () => {
                 if (csvData.length === 0) return;
                 setValidationStatus('validating');
@@ -132,7 +151,6 @@
                 const mobileRegex = /^09\d{8}$/;
                 const numericRegex = /^\d+$/;
 
-                // 模擬掃描延遲感
                 setTimeout(() => {
                     csvData.forEach((row, index) => {
                         const rowIdx = index + 1;
@@ -140,38 +158,32 @@
                         const memberUnified = row.MemberUnified || "";
                         const enAddr = row.MerchantEnAddr || "";
                         const mcType = row.MCType || "";
-                        const bankCode = row.BankCode || ""; // 修正：定義變數
+                        const bankCode = row.BankCode || ""; 
                         const mobile = row.ManagerMobile || "";
                         const email = row.MerchantEmail || "";
 
-                        // 1. 基本必填與長度
-                        if (!merchantName) errors.push({ row: rowIdx, field: "MerchantName", msg: "商店名稱不可為空" });
-                        if (merchantName.length > 60) errors.push({ row: rowIdx, field: "MerchantName", msg: "商店名稱不可超過 60 字" });
-                        if (!memberUnified) errors.push({ row: rowIdx, field: "MemberUnified", msg: "會員證號不可為空" });
+                        if (!merchantName) errors.push({ row: rowIdx, msg: "商店名稱不可為空" });
+                        if (merchantName.length > 60) errors.push({ row: rowIdx, msg: "商店名稱不可超過 60 字" });
+                        if (!memberUnified) errors.push({ row: rowIdx, msg: "會員證號不可為空" });
 
-                        // 2. 類型分辨與連動檢核 (1=企業, 3=個人)
                         if (mcType === "1") { 
-                            if (memberUnified.length !== 8) errors.push({ row: rowIdx, field: "MemberUnified", msg: "企業型統編需為 8 碼" });
-                            if (!row.RepresentName) errors.push({ row: rowIdx, field: "RepresentName", msg: "企業型需提供負責人姓名" });
-                            if (!row.CapitalAmount) errors.push({ row: rowIdx, field: "CapitalAmount", msg: "企業型需提供資本額" });
+                            if (memberUnified.length !== 8) errors.push({ row: rowIdx, msg: "企業型統編需為 8 碼" });
+                            if (!row.RepresentName) errors.push({ row: rowIdx, msg: "企業型需提供負責人姓名" });
+                            if (!row.CapitalAmount) errors.push({ row: rowIdx, msg: "企業型需提供資本額" });
                         } else if (mcType === "3") {
-                            if (memberUnified.length !== 10) errors.push({ row: rowIdx, field: "MemberUnified", msg: "個人型身分證需為 10 碼" });
-                        } else {
-                            errors.push({ row: rowIdx, field: "MCType", msg: "商店類型無效 (需為 1 或 3)" });
+                            if (memberUnified.length !== 10) errors.push({ row: rowIdx, msg: "個人型身分證需為 10 碼" });
                         }
 
-                        // 3. 英文地址 (AMR10073)
                         if (!enAddr) {
-                            errors.push({ row: rowIdx, field: "MerchantEnAddr", msg: "英文地址不可為空" });
+                            errors.push({ row: rowIdx, msg: "英文地址不可為空" });
                         } else if (enAddr.length < 30) {
-                            errors.push({ row: rowIdx, field: "MerchantEnAddr", msg: `英文地址長度不足 (${enAddr.length}/30)` });
+                            errors.push({ row: rowIdx, msg: `英文地址長度不足 (${enAddr.length}/30)` });
                         }
 
-                        // 4. 格式校驗 (手機/Email/銀行)
-                        if (mobile && !mobileRegex.test(mobile)) errors.push({ row: rowIdx, field: "ManagerMobile", msg: "手機格式應為 09xxxxxxxx" });
-                        if (email && !emailRegex.test(email)) errors.push({ row: rowIdx, field: "MerchantEmail", msg: "Email 格式錯誤" });
+                        if (mobile && !mobileRegex.test(mobile)) errors.push({ row: rowIdx, msg: "手機格式應為 09xxxxxxxx" });
+                        if (email && !emailRegex.test(email)) errors.push({ row: rowIdx, msg: "Email 格式錯誤" });
                         if (!bankCode || bankCode.length !== 3 || !numericRegex.test(bankCode)) {
-                            errors.push({ row: rowIdx, field: "BankCode", msg: "銀行代碼需為 3 碼數字" });
+                            errors.push({ row: rowIdx, msg: "銀行代碼需為 3 碼數字" });
                         }
                     });
 
@@ -323,5 +335,4 @@
     </script>
 </body>
 </html>
-
 
