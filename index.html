@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>藍新金流批次商店工具 (ZIP 加密版)</title>
+    <title>藍新金流批次商店工具 (SCR 規範版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & Babel -->
@@ -24,57 +24,19 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
 
         // 自定義圖標組件
         const Icon = ({ children, size = 24, className = "" }) => (
-            <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width={size} 
-                height={size} 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className={className}
-            >
-                {children}
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
         );
 
-        const LayersIcon = (props) => (
-            <Icon {...props}><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></Icon>
-        );
-
-        const ServerIcon = (props) => (
-            <Icon {...props}><rect x="2" y="2" width="20" height="8" rx="2" ry="2" /><rect x="2" y="14" width="20" height="8" rx="2" ry="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" /></Icon>
-        );
-
-        const PackageOpenIcon = (props) => (
-            <Icon {...props}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2Z" /><path d="M12 11v6" /><path d="m9 14 3 3 3-3" /></Icon>
-        );
-
-        const FileArchiveIcon = (props) => (
-            <Icon {...props}><path d="M4 22V4c0-.5.2-1 .6-1.4C5 2.2 5.5 2 6 2h8.5L20 7.5V20c0 .5-.2 1-.6 1.4-.4.4-.9.6-1.4.6h-2" /><polyline points="14 2 14 8 20 8" /><circle cx="10" cy="16" r="2" /><path d="M10 12v2" /><path d="M10 18v2" /></Icon>
-        );
-
-        const LoaderIcon = (props) => (
-            <Icon {...props} className={`animate-spin ${props.className}`}><path d="M21 12a9 9 0 1 1-6.21-8.56" /></Icon>
-        );
-
-        const LockIcon = (props) => (
-            <Icon {...props}><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></Icon>
-        );
-
-        const CheckCircleIcon = (props) => (
-            <Icon {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></Icon>
-        );
-
-        const AlertTriangleIcon = (props) => (
-            <Icon {...props}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></Icon>
-        );
+        const LayersIcon = (props) => (<Icon {...props}><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></Icon>);
+        const ServerIcon = (props) => (<Icon {...props}><rect x="2" y="2" width="20" height="8" rx="2" ry="2" /><rect x="2" y="14" width="20" height="8" rx="2" ry="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" /></Icon>);
+        const PackageOpenIcon = (props) => (<Icon {...props}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2Z" /><path d="M12 11v6" /><path d="m9 14 3 3 3-3" /></Icon>);
+        const FileArchiveIcon = (props) => (<Icon {...props}><path d="M4 22V4c0-.5.2-1 .6-1.4C5 2.2 5.5 2 6 2h8.5L20 7.5V20c0 .5-.2 1-.6 1.4-.4.4-.9.6-1.4.6h-2" /><polyline points="14 2 14 8 20 8" /><circle cx="10" cy="16" r="2" /><path d="M10 12v2" /><path d="M10 18v2" /></Icon>);
+        const LoaderIcon = (props) => (<Icon {...props} className={`animate-spin ${props.className}`}><path d="M21 12a9 9 0 1 1-6.21-8.56" /></Icon>);
+        const LockIcon = (props) => (<Icon {...props}><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></Icon>);
 
         const App = () => {
             const [proxyUrl, setProxyUrl] = useState('http://localhost:3000/api/create-merchant');
@@ -93,7 +55,6 @@
             const [detectedEncoding, setDetectedEncoding] = useState('尚未偵測'); 
             const [validationStatus, setValidationStatus] = useState('idle');
 
-            // 處理 ZIP 解析邏輯
             const processZip = async (file, password) => {
                 if (!file) return;
                 setZipLoading(true);
@@ -101,29 +62,16 @@
                 handleReset();
 
                 try {
-                    // 使用 zip.js 讀取
                     const reader = new zip.ZipReader(new zip.BlobReader(file));
                     const entries = await reader.getEntries();
                     const csvList = [];
 
                     for (const entry of entries) {
                         if (entry.filename.toLowerCase().endsWith('.csv')) {
-                            try {
-                                // 如果有加密，getData 會使用 password 參數
-                                const content = await entry.getData(new zip.Uint8ArrayWriter(), { password });
-                                csvList.push({
-                                    name: entry.filename,
-                                    buffer: content
-                                });
-                            } catch (err) {
-                                if (err.message.includes("password")) {
-                                    throw new Error("密碼錯誤或該檔案需要密碼。");
-                                }
-                                throw err;
-                            }
+                            const content = await entry.getData(new zip.Uint8ArrayWriter(), { password });
+                            csvList.push({ name: entry.filename, buffer: content });
                         }
                     }
-
                     await reader.close();
 
                     if (csvList.length > 0) {
@@ -133,52 +81,26 @@
                         alert("ZIP 檔內找不到任何 CSV 檔案！");
                     }
                 } catch (error) {
-                    console.error("ZIP 解析失敗:", error);
                     alert("ZIP 解析失敗：" + error.message);
                 } finally {
                     setZipLoading(false);
                 }
             };
 
-            const handleZipUpload = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                setZipName(file.name);
-                setLastZipFile(file);
-                processZip(file, zipPassword);
-                e.target.value = null;
-            };
-
-            const handleManualParse = () => {
-                if (!lastZipFile) {
-                    alert("請先選取 ZIP 檔案。");
-                    return;
-                }
-                processZip(lastZipFile, zipPassword);
-            };
-
             const loadCsvFromBuffer = (buffer, fileName) => {
                 setSelectedFileName(fileName);
                 let text = "";
-                let encodingUsed = "utf-8";
-
                 try {
                     const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
                     text = utf8Decoder.decode(buffer);
-                    encodingUsed = "UTF-8";
+                    setDetectedEncoding("UTF-8");
                 } catch (e) {
-                    const big5Decoder = new TextDecoder('big5');
-                    text = big5Decoder.decode(buffer);
-                    encodingUsed = "Big5 (Excel)";
+                    text = new TextDecoder('big5').decode(buffer);
+                    setDetectedEncoding("Big5 (Excel)");
                 }
-
-                setDetectedEncoding(encodingUsed);
 
                 const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-                if (lines.length < 2) {
-                    setCsvData([]);
-                    return;
-                }
+                if (lines.length < 2) { setCsvData([]); return; }
 
                 const headers = lines[0].split(',').map(h => h.trim());
                 const json = lines.slice(1).map(line => {
@@ -192,52 +114,26 @@
                 setCsvData(json);
                 setResults(new Array(json.length).fill({ status: 'pending', message: '等待執行' }));
                 setValidationStatus('idle');
-                setValidationErrors([]);
             };
 
             const handleReset = () => {
-                if (processing) return;
-                setCsvData([]);
-                setResults([]);
-                setValidationErrors([]);
-                setValidationStatus('idle');
-                setDetectedEncoding('尚未偵測');
-                setProgress(0);
-            };
-
-            const performValidation = () => {
-                if (csvData.length === 0) return;
-                setValidationStatus('validating');
-                const errors = [];
-                setTimeout(() => {
-                    csvData.forEach((item, index) => {
-                        const rowNum = index + 1;
-                        if (!item.MemberUnified) errors.push({ row: rowNum, msg: '會員證號不可為空' });
-                        if (!item.MerchantName) errors.push({ row: rowNum, msg: '商店名稱不可為空' });
-                        const isCompany = item.MemberUnified && item.MemberUnified.length === 8;
-                        if (isCompany && (!item.RepresentName || !item.ManagerID)) {
-                            errors.push({ row: rowNum, msg: '企業型缺少負責人資訊' });
-                        }
-                    });
-                    setValidationErrors(errors);
-                    setValidationStatus(errors.length === 0 ? 'passed' : 'failed');
-                }, 600);
+                setCsvData([]); setResults([]); setValidationStatus('idle'); setProgress(0);
             };
 
             const runBatch = async () => {
-                if (validationStatus !== 'passed') return;
                 setProcessing(true);
-                const startTime = Math.floor(Date.now() / 1000);
+                // 使用短時間戳記確保總長度符合 SCR + 8位時間 + 3位序號 = 14位 (<15)
+                const shortTime = Math.floor(Date.now() / 1000).toString().slice(-8);
 
                 for (let i = 0; i < csvData.length; i++) {
                     const item = csvData[i];
-                    setResults(prev => { 
-                        const next = [...prev]; 
-                        next[i] = { status: 'loading', message: '發送至 Proxy...' }; 
-                        return next; 
-                    });
+                    setResults(prev => { const next = [...prev]; next[i] = { status: 'loading', message: '傳輸中...' }; return next; });
                     
-                    let mid = item.MerchantID || `ZIP${startTime}${i.toString().padStart(3, '0')}`;
+                    // 修正關鍵：改為 SCR 前綴，且控制長度
+                    let mid = item.MerchantID;
+                    if (!mid || mid.trim() === '') {
+                        mid = `SCR${shortTime}${i.toString().padStart(3, '0')}`;
+                    }
                     
                     try {
                         const response = await fetch(proxyUrl, {
@@ -248,11 +144,11 @@
                         const resJson = await response.json();
                         setResults(prev => { 
                             const next = [...prev]; 
-                            next[i] = resJson.status === 'SUCCESS' ? { status: 'success', message: '建立成功' } : { status: 'error', message: resJson.message };
+                            next[i] = resJson.status === 'SUCCESS' ? { status: 'success', message: `成功: ${mid}` } : { status: 'error', message: resJson.message };
                             return next;
                         });
                     } catch (err) {
-                        setResults(prev => { const next = [...prev]; next[i] = { status: 'error', message: 'Proxy 連線失敗' }; return next; });
+                        setResults(prev => { const next = [...prev]; next[i] = { status: 'error', message: '連線 Proxy 失敗' }; return next; });
                     }
                     setProgress(((i + 1) / csvData.length) * 100);
                     await new Promise(r => setTimeout(r, 600));
@@ -262,169 +158,60 @@
 
             return (
                 <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
-                    <header className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+                    <header className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col md:row justify-between items-center gap-4">
                         <div className="flex items-center gap-4">
-                            <div className="bg-indigo-600 p-3 rounded-2xl shadow-lg text-white">
-                                <LayersIcon size={24} />
-                            </div>
+                            <div className="bg-indigo-600 p-3 rounded-2xl shadow-lg text-white"><LayersIcon size={24} /></div>
                             <div>
-                                <h1 className="text-xl font-black text-slate-800 tracking-tight">藍新批次管理 (ZIP 加密支援)</h1>
-                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Security Unzip Engine 3.0</p>
+                                <h1 className="text-xl font-black text-slate-800">藍新批次管理 (SCR 規範版)</h1>
+                                <p className="text-xs text-rose-500 font-bold tracking-widest">⚠️ 自動生成前綴已改為 SCR</p>
                             </div>
                         </div>
-                        <div className="flex gap-3">
-                            <button 
-                                onClick={runBatch} 
-                                disabled={processing || validationStatus !== 'passed'} 
-                                className={`px-10 py-3 rounded-2xl font-bold text-white transition-all transform active:scale-95 shadow-xl ${
-                                    processing || validationStatus !== 'passed' ? 'bg-slate-300 shadow-none' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
-                                }`}
-                            >
-                                開始執行批次
-                            </button>
-                        </div>
+                        <button onClick={runBatch} disabled={processing || csvData.length === 0} className={`px-10 py-3 rounded-2xl font-bold text-white transition-all shadow-xl ${processing || csvData.length === 0 ? 'bg-slate-300' : 'bg-indigo-600 hover:bg-indigo-700'}`}>開始執行批次</button>
                     </header>
 
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                        <div className="space-y-6">
+                        <div className="space-y-6 text-sm">
                             <section className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-                                <h3 className="text-xs font-black text-slate-400 mb-4 flex items-center gap-2 uppercase tracking-widest">
-                                    <ServerIcon size={14} /> 1. Proxy API 端點
-                                </h3>
-                                <input 
-                                    type="text" 
-                                    value={proxyUrl} 
-                                    onChange={e => setProxyUrl(e.target.value)} 
-                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-100 outline-none" 
-                                />
+                                <h3 className="text-xs font-black text-slate-400 mb-4 flex items-center gap-2 uppercase tracking-widest"><ServerIcon size={14} /> 1. Proxy 設定</h3>
+                                <input type="text" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} className="w-full px-4 py-2 bg-slate-50 border rounded-xl text-xs font-mono outline-none" />
                             </section>
-
                             <section className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                                <h3 className="text-xs font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest">
-                                    <PackageOpenIcon size={14} /> 2. 加密 ZIP 上傳
-                                </h3>
-                                
-                                <div className="space-y-2">
-                                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
-                                        <LockIcon size={10} /> ZIP 解壓密碼
-                                    </label>
-                                    <input 
-                                        type="password" 
-                                        value={zipPassword} 
-                                        onChange={e => setZipPassword(e.target.value)}
-                                        placeholder="若無密碼請留空"
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-100"
-                                    />
+                                <h3 className="text-xs font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest"><PackageOpenIcon size={14} /> 2. 加密 ZIP 上傳</h3>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1"><LockIcon size={10} /> 解壓密碼</label>
+                                    <input type="password" value={zipPassword} onChange={e => setZipPassword(e.target.value)} className="w-full px-4 py-2 bg-slate-50 border rounded-xl text-xs outline-none" />
                                 </div>
-
                                 <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center relative hover:bg-indigo-50/50 transition-all cursor-pointer group">
-                                    <input type="file" accept=".zip" onChange={handleZipUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                                    {zipLoading ? <LoaderIcon size={32} className="mx-auto text-indigo-400" /> : <FileArchiveIcon size={32} className="mx-auto text-slate-300 group-hover:text-indigo-400 transition-colors" />}
+                                    <input type="file" accept=".zip" onChange={(e) => {
+                                        const file = e.target.files[0];
+                                        if(!file) return;
+                                        setZipName(file.name); setLastZipFile(file);
+                                        processZip(file, zipPassword);
+                                    }} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                    <FileArchiveIcon size={32} className="mx-auto text-slate-300 group-hover:text-indigo-400" />
                                     <span className="text-xs text-slate-500 block font-bold mt-2">{zipName || '選擇 .zip 檔案'}</span>
                                 </div>
-
-                                {lastZipFile && (
-                                    <button 
-                                        onClick={handleManualParse}
-                                        className="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-bold hover:bg-indigo-100 transition-colors"
-                                    >
-                                        使用新密碼重新讀取 ZIP
-                                    </button>
-                                )}
-
-                                {extractedCsvFiles.length > 0 && (
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">ZIP 內 CSV 檔案 ({extractedCsvFiles.length})</label>
-                                        <div className="max-h-32 overflow-y-auto custom-scrollbar border rounded-xl divide-y text-[11px] bg-slate-50">
-                                            {extractedCsvFiles.map((file, i) => (
-                                                <button 
-                                                    key={i} 
-                                                    onClick={() => loadCsvFromBuffer(file.buffer, file.name)}
-                                                    className={`w-full text-left px-3 py-2 transition-colors ${selectedFileName === file.name ? 'bg-indigo-600 text-white' : 'hover:bg-indigo-50'}`}
-                                                >
-                                                    {file.name}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                <button 
-                                    onClick={performValidation} 
-                                    disabled={csvData.length === 0 || processing}
-                                    className="w-full py-3 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 font-bold text-xs hover:bg-emerald-100 transition-colors"
-                                >
-                                    檢核目前 CSV
-                                </button>
-                            </section>
-
-                            <section className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-                                <h3 className="text-xs font-black text-slate-400 mb-4 uppercase tracking-widest">3. 狀態報告</h3>
-                                {validationStatus === 'passed' ? (
-                                    <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-                                        <CheckCircleIcon size={16} /> 格式通過檢核
-                                    </div>
-                                ) : validationStatus === 'failed' ? (
-                                    <div className="text-rose-600 font-bold text-xs bg-rose-50 p-3 rounded-xl border border-rose-100">
-                                        <AlertTriangleIcon size={16} className="inline mr-1" /> 格式錯誤 ({validationErrors.length})
-                                    </div>
-                                ) : (
-                                    <div className="text-slate-300 text-xs text-center py-4 italic">等待解析資料...</div>
-                                )}
                             </section>
                         </div>
-
                         <div className="lg:col-span-3 bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                            <div className="px-6 py-5 border-b bg-slate-50/50 flex justify-between items-center">
-                                <div>
-                                    <span className="font-black text-slate-700 uppercase tracking-widest text-xs">CSV Preview: </span>
-                                    <span className="text-xs font-bold text-indigo-600">{selectedFileName || '尚未選取檔案'}</span>
-                                </div>
-                                {csvData.length > 0 && (
-                                    <div className="text-[10px] font-black bg-white px-3 py-1 rounded-full border border-slate-200">
-                                        編碼：{detectedEncoding}
-                                    </div>
-                                )}
+                            <div className="px-6 py-5 border-b bg-slate-50/50 flex justify-between items-center text-xs">
+                                <span className="font-bold text-indigo-600">當前檔案：{selectedFileName || '無'}</span>
+                                <span className="text-slate-400">MerchantID 規則：SCR + 11 位數字</span>
                             </div>
-                            
-                            <div className="flex-1 overflow-auto custom-scrollbar">
+                            <div className="flex-1 overflow-auto custom-scrollbar min-h-[400px]">
                                 <table className="w-full text-left text-xs">
-                                    <thead className="sticky top-0 bg-white border-b shadow-sm z-10 text-[10px] text-slate-400 uppercase font-bold tracking-widest">
-                                        <tr>
-                                            <th className="px-6 py-4 w-12">#</th>
-                                            <th className="px-6 py-4">商店/會員資訊</th>
-                                            <th className="px-6 py-4">執行進度</th>
-                                        </tr>
+                                    <thead className="sticky top-0 bg-white border-b z-10 text-[10px] text-slate-400 uppercase font-bold tracking-widest">
+                                        <tr><th className="px-6 py-4">#</th><th className="px-6 py-4">商店名稱</th><th className="px-6 py-4">狀態回傳</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
-                                        {csvData.length === 0 ? (
-                                            <tr>
-                                                <td colSpan="3" className="px-6 py-40 text-center">
-                                                    <div className="flex flex-col items-center gap-4 text-slate-300">
-                                                        <Icon size={48}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><circle cx="11" cy="14" r="3" /><path d="m20 22-5-5" /></Icon>
-                                                        <p className="font-medium text-sm">請先解壓縮 ZIP 檔案並選取 CSV</p>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ) : (
+                                        {csvData.length === 0 ? (<tr><td colSpan="3" className="px-6 py-20 text-center text-slate-300">請解壓 ZIP 以預覽資料</td></tr>) : (
                                             csvData.map((item, idx) => (
                                                 <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="px-6 py-5 text-slate-300 font-mono">{idx + 1}</td>
-                                                    <td className="px-6 py-5">
-                                                        <div className="font-bold text-slate-700 mb-0.5">{item.MerchantName}</div>
-                                                        <div className="text-[10px] text-slate-400 font-mono tracking-tight">{item.MemberUnified}</div>
-                                                    </td>
-                                                    <td className="px-6 py-5">
-                                                        <div className="flex flex-col">
-                                                            {results[idx]?.status === 'success' ? (
-                                                                <span className="text-emerald-600 font-bold flex items-center gap-1 leading-none"><Icon size={12}><polyline points="20 6 9 17 4 12" /></Icon> 成功</span>
-                                                            ) : results[idx]?.status === 'error' ? (
-                                                                <span className="text-rose-500 font-bold flex items-center gap-1 leading-none"><Icon size={12}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></Icon> 失敗</span>
-                                                            ) : results[idx]?.status === 'loading' ? (
-                                                                <span className="text-indigo-600 font-bold animate-pulse">發送中...</span>
-                                                            ) : <span className="text-slate-200 italic">待執行</span>}
-                                                            <span className="text-[10px] text-slate-400 mt-1 max-w-[200px] truncate">{results[idx]?.message}</span>
-                                                        </div>
+                                                    <td className="px-6 py-5 text-slate-300">{idx + 1}</td>
+                                                    <td className="px-6 py-5 font-bold text-slate-700">{item.MerchantName}<span className="block text-[10px] font-normal text-slate-400">{item.MemberUnified}</span></td>
+                                                    <td className="px-6 py-5 font-bold">
+                                                        {results[idx]?.status === 'success' ? <span className="text-emerald-600">✓ 成功</span> : results[idx]?.status === 'error' ? <span className="text-rose-500">✕ 失敗</span> : results[idx]?.status === 'loading' ? <span className="text-indigo-500 animate-pulse">發送中</span> : <span className="text-slate-200 italic">待執行</span>}
+                                                        <p className="text-[10px] font-normal text-slate-400 mt-1">{results[idx]?.message}</p>
                                                     </td>
                                                 </tr>
                                             ))
@@ -432,14 +219,6 @@
                                     </tbody>
                                 </table>
                             </div>
-                            
-                            {processing && (
-                                <div className="p-4 bg-indigo-600 text-white font-bold text-xs flex items-center justify-between relative overflow-hidden">
-                                    <span className="relative z-10">批次執行中...</span>
-                                    <span className="relative z-10">{Math.round(progress)}%</span>
-                                    <div className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all duration-300 z-0" style={{width: `${progress}%`}}></div>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
