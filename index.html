@@ -1,255 +1,437 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>藍新批次管理 - 全功能整合版</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/@zip.js/zip.js@2.7.53/dist/zip.min.js"></script>
-    <!-- Firebase Compat (預留連線) -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; }
-        .code-font { font-family: 'Fira Code', monospace; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .error-cell { border: 2px solid #ef4444 !important; background-color: #fef2f2; }
-        .editable-input:focus { background-color: white; box-shadow: 0 0 0 2px #6366f1; outline: none; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-900">
-    <div id="root"></div>
+import React, { useState, useEffect } from 'react';
+import { 
+  Upload, FileText, CheckCircle, XCircle, Play, Settings, 
+  AlertTriangle, Table as TableIcon, Loader2, ClipboardCheck, 
+  AlertCircle, SearchCheck, RotateCcw, Server, ShieldCheck,
+  Edit3, Eye, Database, Activity, Lock, Archive, Key
+} from 'lucide-react';
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+// 注意：本組件依賴全域的 zip.js 庫 (https://unpkg.com/@zip.js/zip.js)
+// 以及環境注入的 firebase 變數
 
-        const App = () => {
-            const [csvData, setCsvData] = useState([]);
-            const [idPrefix, setIdPrefix] = useState('SCR'); // 預設值
-            const [zipPassword, setZipPassword] = useState('');
-            const [validationStatus, setValidationStatus] = useState('idle');
-            const [errorMap, setErrorMap] = useState({});
-            const [results, setResults] = useState([]);
-            const [selectedJson, setSelectedJson] = useState(null);
-            const [processing, setProcessing] = useState(false);
-            const [dbRecords, setDbRecords] = useState([]);
-            const [cloudConnected, setCloudConnected] = useState(false);
+const App = () => {
+  // 1. 配置與連線狀態
+  const [proxyUrl, setProxyUrl] = useState('http://localhost:3000');
+  const [idPrefix, setIdPrefix] = useState('SCR');
+  const [cloudEnabled, setCloudEnabled] = useState(false);
 
-            // 1. 初始化：獲取前綴並嘗試連動 Firebase
-            useEffect(() => {
-                const init = async () => {
-                    // 獲取後端代號前綴 (PartnerID 前三碼)
-                    try {
-                        const res = await fetch('http://localhost:3000/api/config');
-                        const data = await res.json();
-                        if (data.prefix) setIdPrefix(data.prefix);
-                    } catch (e) { console.warn("未連接後端，使用預設前綴"); }
+  // 2. 資料狀態
+  const [csvData, setCsvData] = useState([]);
+  const [results, setResults] = useState([]);
+  const [dbRecords, setDbRecords] = useState([]); 
+  const [zipPassword, setZipPassword] = useState(''); // ZIP 密碼狀態
+  const [validationStatus, setValidationStatus] = useState('idle');
+  const [validationErrors, setValidationErrors] = useState([]);
+  const [errorMap, setErrorMap] = useState({}); 
+  
+  // 3. UI 處理狀態
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [detectedEncoding, setDetectedEncoding] = useState('尚未偵測');
+  const [selectedJson, setSelectedJson] = useState(null);
+  const [fileName, setFileName] = useState('');
 
-                    // 嘗試連動 Firebase (僅當佈署後環境變數存在時)
-                    try {
-                        if (typeof __firebase_config !== 'undefined') {
-                            const config = JSON.parse(__firebase_config);
-                            if (!firebase.apps.length) firebase.initializeApp(config);
-                            await firebase.auth().signInAnonymously();
-                            setCloudConnected(true);
-                            // 此處可增加 onSnapshot 監聽代碼
-                        }
-                    } catch (e) { console.log("雲端尚未佈署，監控看板暫不啟用"); }
-                };
-                init();
-            }, []);
+  // --- 初始化：獲取後端前綴配置與 Firebase 偵測 ---
+  useEffect(() => {
+    const initSystem = async () => {
+      // A. 同步後端 PartnerID 前三碼
+      try {
+        const res = await fetch(`${proxyUrl}/api/config`);
+        const data = await res.json();
+        if (data.prefix) setIdPrefix(data.prefix);
+      } catch (e) {
+        console.warn("無法獲取後端前綴，使用預設 SCR");
+      }
 
-            // 2. CSV 解析器
-            const parseCSVLine = (text) => {
-                const result = [];
-                let cell = '', inQuotes = false;
-                for (let i = 0; i < text.length; i++) {
-                    const char = text[i];
-                    if (char === '"') inQuotes = !inQuotes;
-                    else if (char === ',' && !inQuotes) { result.push(cell.trim()); cell = ''; }
-                    else cell += char;
-                }
-                result.push(cell.trim());
-                return result;
-            };
+      // B. 偵測雲端佈署狀態 (預留架構)
+      if (typeof firebase !== 'undefined' && typeof __firebase_config !== 'undefined') {
+        try {
+          const config = JSON.parse(__firebase_config);
+          if (!firebase.apps.length) firebase.initializeApp(config);
+          
+          firebase.auth().signInAnonymously().then(() => {
+            setCloudEnabled(true);
+            const db = firebase.firestore();
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app';
+            
+            const collRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('merchant_records');
+            collRef.onSnapshot(snapshot => {
+              const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              setDbRecords(data.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0)));
+            });
+          });
+        } catch (e) {
+          console.log("Firebase 尚未配置");
+        }
+      }
+    };
+    initSystem();
+  }, [proxyUrl]);
 
-            // 3. 檔案處理 (ZIP + CSV)
-            const handleZip = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                try {
-                    const reader = new zip.ZipReader(new zip.BlobReader(file));
-                    const entries = await reader.getEntries();
-                    for (const entry of entries) {
-                        if (entry.filename.toLowerCase().endsWith('.csv')) {
-                            const buf = await entry.getData(new zip.Uint8ArrayWriter(), { password: zipPassword });
-                            const text = new TextDecoder('utf-8').decode(buf);
-                            const lines = text.split(/\r?\n/).filter(l => l.trim());
-                            const headers = parseCSVLine(lines[0]);
-                            const data = lines.slice(1).map(l => {
-                                const vals = parseCSVLine(l);
-                                return headers.reduce((o, h, i) => ({ ...o, [h]: vals[i] || "" }), {});
-                            });
-                            setCsvData(data);
-                            setResults(new Array(data.length).fill(null));
-                            setValidationStatus('idle');
-                        }
-                    }
-                    await reader.close();
-                } catch (e) { alert("ZIP 解壓失敗，請檢查密碼"); }
-            };
+  // --- 核心解析：CSV 文字轉物件 (處理亂碼、引號) ---
+  const processRawText = (text, encodingLabel) => {
+    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+    if (lines.length < 2) return;
 
-            // 4. 線上編輯
-            const handleEdit = (idx, field, val) => {
-                const next = [...csvData];
-                next[idx][field] = val;
-                setCsvData(next);
-                setValidationStatus('idle');
-            };
+    const parseLine = (line) => {
+      const result = [];
+      let cell = '', inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') inQuotes = !inQuotes;
+        else if (char === ',' && !inQuotes) { result.push(cell.trim()); cell = ''; }
+        else cell += char;
+      }
+      result.push(cell.trim());
+      return result;
+    };
 
-            // 5. 逐欄檢核 (含英文地址 30 字限制)
-            const validate = () => {
-                const errors = {};
-                csvData.forEach((row, idx) => {
-                    if (!row.MerchantName || row.MerchantName.length > 60) errors[`${idx}-MerchantName`] = true;
-                    if (!row.MerchantEnAddr || row.MerchantEnAddr.length < 30) errors[`${idx}-MerchantEnAddr`] = true;
-                    if (row.MCType === "1" && row.MemberUnified?.length !== 8) errors[`${idx}-MemberUnified`] = true;
-                    if (row.MCType === "3" && row.MemberUnified?.length !== 10) errors[`${idx}-MemberUnified`] = true;
-                });
-                setErrorMap(errors);
-                setValidationStatus(Object.keys(errors).length === 0 ? 'passed' : 'failed');
-            };
+    const headers = parseLine(lines[0]);
+    const data = lines.slice(1).map(line => {
+      const values = parseLine(line);
+      return headers.reduce((obj, header, index) => {
+        obj[header] = values[index] || "";
+        return obj;
+      }, {});
+    });
 
-            // 6. 批次執行 (採用後端動態前綴)
-            const runBatch = async () => {
-                setProcessing(true);
-                const timeStr = Math.floor(Date.now() / 1000).toString().slice(-8);
-                for (let i = 0; i < csvData.length; i++) {
-                    const item = csvData[i];
-                    // 生成格式: 前綴(3) + 時間(8) + 序號(3) = 14 字
-                    let mid = item.MerchantID || `${idPrefix}${timeStr}${i.toString().padStart(3, '0')}`;
-                    try {
-                        const res = await fetch('http://localhost:3000/api/create-merchant', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ...item, MerchantID: mid })
-                        });
-                        const data = await res.json();
-                        setResults(prev => { const n = [...prev]; n[i] = data; return n; });
-                    } catch (e) {
-                        setResults(prev => { const n = [...prev]; n[i] = { Status: 'ERROR', Message: 'Proxy 連線失敗' }; return n; });
-                    }
-                    await new Promise(r => setTimeout(r, 400));
-                }
-                setProcessing(false);
-            };
+    setCsvData(data);
+    setResults(new Array(data.length).fill(null));
+    setValidationStatus('idle');
+    setValidationErrors([]);
+    setErrorMap({});
+    setDetectedEncoding(encodingLabel);
+  };
 
-            return (
-                <div className="max-w-[1600px] mx-auto p-6 space-y-6 text-sm">
-                    {/* Header */}
-                    <header className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col lg:flex-row justify-between items-center gap-6">
-                        <div className="flex items-center gap-4">
-                            <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-xl italic font-black text-xl">NP</div>
-                            <div>
-                                <h1 className="text-2xl font-black text-slate-800 tracking-tight">藍新商店批次工具</h1>
-                                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1 italic">代號前綴: <span className="text-indigo-600 underline">{idPrefix}</span></p>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                            <input type="password" placeholder="ZIP 密碼" value={zipPassword} onChange={e => setZipPassword(e.target.value)} className="px-4 py-2 bg-slate-50 border rounded-xl outline-none w-32 focus:ring-2 focus:ring-indigo-100" />
-                            <div className="relative">
-                                <input type="file" onChange={handleZip} className="absolute inset-0 opacity-0 cursor-pointer" />
-                                <button className="bg-slate-100 text-slate-600 px-6 py-2.5 rounded-2xl font-bold">1. 匯入 ZIP</button>
-                            </div>
-                            <button onClick={validate} disabled={csvData.length === 0} className={`px-6 py-2.5 rounded-2xl font-bold border-2 transition-all ${csvData.length === 0 ? 'text-slate-200 border-slate-50' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>2. 檢核</button>
-                            <button onClick={runBatch} disabled={processing || validationStatus !== 'passed'} className="bg-indigo-600 text-white px-10 py-2.5 rounded-2xl font-bold shadow-xl shadow-indigo-100 disabled:bg-slate-300">3. 執行批次</button>
-                        </div>
-                    </header>
+  // --- 檔案處理：判斷 ZIP 或 CSV ---
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setFileName(file.name);
 
-                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-                        {/* 左側：編輯區 */}
-                        <div className="xl:col-span-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[700px]">
-                            <div className="px-8 py-5 border-b bg-slate-50 font-black text-slate-500 uppercase flex justify-between">
-                                <span>批次編輯表單</span>
-                                {validationStatus === 'failed' && <span className="text-rose-500 animate-pulse">請修正紅框內容</span>}
-                            </div>
-                            <div className="flex-1 overflow-auto custom-scrollbar">
-                                <table className="w-full text-left text-xs table-fixed min-w-[1000px]">
-                                    <thead className="sticky top-0 bg-white border-b z-10 text-[10px] text-slate-400 font-bold uppercase">
-                                        <tr>
-                                            <th className="px-6 py-4 w-12">#</th>
-                                            <th className="px-4 py-4 w-48">商店名稱 (60)</th>
-                                            <th className="px-4 py-4 w-32">證號/統編</th>
-                                            <th className="px-4 py-4 w-64">英文地址 (Min 30)</th>
-                                            <th className="px-4 py-4 w-24">結果</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {csvData.map((row, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-4 text-slate-300 font-mono">{idx + 1}</td>
-                                                <td className="px-2 py-2"><input value={row.MerchantName} onChange={e => handleEdit(idx, 'MerchantName', e.target.value)} className={`w-full px-3 py-2 rounded-xl bg-transparent editable-input ${errorMap[`${idx}-MerchantName`] ? 'error-cell' : ''}`} /></td>
-                                                <td className="px-2 py-2"><input value={row.MemberUnified} onChange={e => handleEdit(idx, 'MemberUnified', e.target.value)} className={`w-full px-3 py-2 rounded-xl bg-transparent font-mono ${errorMap[`${idx}-MemberUnified`] ? 'error-cell' : ''}`} /></td>
-                                                <td className="px-2 py-2"><input value={row.MerchantEnAddr} onChange={e => handleEdit(idx, 'MerchantEnAddr', e.target.value)} className={`w-full px-3 py-2 rounded-xl bg-transparent text-[10px] ${errorMap[`${idx}-MerchantEnAddr`] ? 'error-cell' : ''}`} /></td>
-                                                <td className="px-4 py-4">{results[idx] ? <button onClick={() => setSelectedJson(results[idx])} className={`px-2 py-1 rounded font-bold text-[9px] ${results[idx].Status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>JSON</button> : <span className="text-slate-200 italic">待機</span>}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+    if (file.name.toLowerCase().endsWith('.zip')) {
+      // 處理 ZIP 檔案
+      handleZipFile(file);
+    } else {
+      // 處理原始 CSV 檔案
+      handleCsvFile(file);
+    }
+    e.target.value = null; 
+  };
 
-                        {/* 右側：預留監控區 */}
-                        <div className="xl:col-span-4 bg-slate-900 rounded-[2.5rem] shadow-2xl flex flex-col h-[700px] text-slate-300 overflow-hidden">
-                            <div className="px-8 py-6 border-b border-slate-800 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-2 h-2 rounded-full ${cloudConnected ? 'bg-emerald-500 animate-ping' : 'bg-slate-700'}`}></div>
-                                    <span className="text-xs font-black uppercase text-white tracking-widest">Cloud Monitoring</span>
-                                </div>
-                                <span className="text-[10px] text-slate-500 font-mono">{cloudConnected ? 'CONNECTED' : 'LOCAL_ONLY'}</span>
-                            </div>
-                            <div className="flex-1 overflow-auto custom-scrollbar p-6 space-y-4">
-                                {!cloudConnected ? (
-                                    <div className="text-center py-40 text-slate-700 border-2 border-dashed border-slate-800 rounded-[2rem]">
-                                        <p className="font-bold text-sm">雲端資料庫尚未佈署</p>
-                                        <p className="text-[10px] mt-2 italic px-8">當您將後端上傳至 Render/Railway 並設定 Firebase 變數後，此處將自動啟用實時監控。</p>
-                                    </div>
-                                ) : (
-                                    <div className="text-center text-xs italic">正在等待第一筆雲端記錄...</div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+  // 1. 處理單個 CSV
+  const handleCsvFile = (file) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      decodeAndProcess(new Uint8Array(event.target.result));
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
-                    {/* JSON 解析 Modal */}
-                    {selectedJson && (
-                        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 flex items-center justify-center p-6" onClick={() => setSelectedJson(null)}>
-                            <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[85%] flex flex-col" onClick={e => e.stopPropagation()}>
-                                <div className="px-10 py-8 border-b flex justify-between items-center bg-slate-50">
-                                    <h2 className="text-xl font-black text-slate-800">藍新回應解析</h2>
-                                    <button onClick={() => setSelectedJson(null)} className="text-slate-400 hover:text-slate-900 font-black">關閉</button>
-                                </div>
-                                <div className="flex-1 overflow-auto p-10 code-font text-xs">
-                                    <pre className="bg-slate-900 text-indigo-300 p-8 rounded-[2rem] leading-relaxed overflow-x-auto shadow-inner">
-                                        {JSON.stringify(selectedJson, null, 4)}
-                                    </pre>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+  // 2. 處理 ZIP (支援密碼)
+  const handleZipFile = async (file) => {
+    try {
+      // 檢查 zip.js 是否載入
+      if (typeof zip === 'undefined') {
+        alert("系統組件 zip.js 尚未就緒，請重新整理頁面。");
+        return;
+      }
+
+      const reader = new zip.ZipReader(new zip.BlobReader(file));
+      const entries = await reader.getEntries();
+      
+      // 尋找 ZIP 裡的第一個 CSV 檔案
+      const csvEntry = entries.find(e => e.filename.toLowerCase().endsWith('.csv'));
+      
+      if (csvEntry) {
+        try {
+          const uint8Writer = new zip.Uint8ArrayWriter();
+          const data = await csvEntry.getData(uint8Writer, { password: zipPassword });
+          decodeAndProcess(data);
+        } catch (pwErr) {
+          alert("解壓縮失敗：密碼錯誤或檔案損毀。");
+        }
+      } else {
+        alert("ZIP 檔案內找不到任何 CSV 檔案。");
+      }
+      await reader.close();
+    } catch (err) {
+      alert("ZIP 格式解析失敗。");
+      console.error(err);
+    }
+  };
+
+  // 3. 通用解碼邏輯 (UTF8 / Big5)
+  const decodeAndProcess = (uint8) => {
+    let text = "";
+    let label = "UTF-8";
+    const hasBOM = uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF;
+
+    try {
+      const decoder = new TextDecoder('utf-8', { fatal: true });
+      text = decoder.decode(hasBOM ? uint8.slice(3) : uint8);
+    } catch (err) {
+      const big5Decoder = new TextDecoder('big5');
+      text = big5Decoder.decode(uint8);
+      label = "Big5 (Excel)";
+    }
+    processRawText(text, label);
+  };
+
+  // --- 線上編輯與檢核邏輯 ---
+  const handleCellEdit = (idx, field, val) => {
+    const nextData = [...csvData];
+    nextData[idx][field] = val;
+    setCsvData(nextData);
+    setValidationStatus('idle');
+  };
+
+  const performValidation = () => {
+    setValidationStatus('validating');
+    const errors = [];
+    const newErrorMap = {};
+    const mobileReg = /^09\d{8}$/;
+
+    setTimeout(() => {
+      csvData.forEach((row, index) => {
+        const rowIdx = index + 1;
+        if (!row.MerchantName || row.MerchantName.length > 60) {
+          errors.push({ row: rowIdx, field: "商店名稱", msg: "1-60 字" });
+          newErrorMap[`${index}-MerchantName`] = true;
+        }
+        if (!row.MerchantEnAddr || row.MerchantEnAddr.length < 30) {
+          errors.push({ row: rowIdx, field: "英文地址", msg: "需滿 30 字" });
+          newErrorMap[`${index}-MerchantEnAddr`] = true;
+        }
+        if (row.MCType === "1" && row.MemberUnified?.length !== 8) {
+          errors.push({ row: rowIdx, field: "統編", msg: "應為 8 碼" });
+          newErrorMap[`${index}-MemberUnified`] = true;
+        }
+        if (row.MCType === "3" && row.MemberUnified?.length !== 10) {
+          errors.push({ row: rowIdx, field: "身分證", msg: "應為 10 碼" });
+          newErrorMap[`${index}-MemberUnified`] = true;
+        }
+        if (row.ManagerMobile && !mobileReg.test(row.ManagerMobile)) {
+          errors.push({ row: rowIdx, field: "手機", msg: "09xxxxxxxx" });
+          newErrorMap[`${index}-ManagerMobile`] = true;
+        }
+      });
+      setValidationErrors(errors);
+      setErrorMap(newErrorMap);
+      setValidationStatus(errors.length === 0 ? 'passed' : 'failed');
+    }, 600);
+  };
+
+  // --- 執行傳送 ---
+  const runBatch = async () => {
+    if (validationStatus !== 'passed') return;
+    setProcessing(true);
+    const timeStr = Math.floor(Date.now() / 1000).toString().slice(-8);
+
+    for (let i = 0; i < csvData.length; i++) {
+      const item = csvData[i];
+      let mid = item.MerchantID || `${idPrefix}${timeStr}${i.toString().padStart(3, '0')}`;
+      try {
+        const res = await fetch(`${proxyUrl}/api/create-merchant`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...item, MerchantID: mid })
+        });
+        const data = await res.json();
+        setResults(prev => { const n = [...prev]; n[i] = data; return n; });
+      } catch (err) {
+        setResults(prev => { const n = [...prev]; n[i] = { Status: 'ERROR', Message: '連線 Proxy 失敗' }; return n; });
+      }
+      setProgress(((i + 1) / csvData.length) * 100);
+      await new Promise(r => setTimeout(r, 400));
+    }
+    setProcessing(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+        
+        {/* Header */}
+        <header className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-5">
+            <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-xl">
+              <Archive size={32} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight">藍新批次管理系統</h1>
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-black border border-indigo-100 uppercase">
+                  Prefix: {idPrefix}
+                </span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${cloudEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                   {cloudEnabled ? <Activity size={10} className="animate-pulse" /> : <Lock size={10} />}
+                   {cloudEnabled ? '雲端即時連動' : '本地測試模式'}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap gap-3 items-end">
+             <div className="flex flex-col">
+                <label className="text-[9px] font-bold text-slate-400 mb-1 ml-1 flex items-center gap-1"><Key size={10}/> ZIP 解壓密碼 (若有)</label>
+                <input 
+                  type="password"
+                  value={zipPassword} 
+                  onChange={e => setZipPassword(e.target.value)} 
+                  placeholder="留空代表無密碼"
+                  className="px-4 py-2 bg-slate-50 border rounded-xl text-xs outline-none w-36 focus:ring-2 focus:ring-indigo-100" 
+                />
+             </div>
+             <div className="relative mt-auto">
+                <input type="file" accept=".csv,.zip" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
+                <button className="bg-slate-800 text-white px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg flex items-center gap-2">
+                  <Upload size={16} /> 匯入 ZIP / CSV
+                </button>
+             </div>
+             <button onClick={performValidation} disabled={csvData.length === 0} className="mt-auto bg-emerald-50 text-emerald-600 border border-emerald-100 px-6 py-2.5 rounded-2xl font-bold text-sm">2. 檢核規範</button>
+             <button onClick={runBatch} disabled={processing || validationStatus !== 'passed'} className="mt-auto bg-indigo-600 text-white px-10 py-2.5 rounded-2xl font-bold text-sm shadow-xl shadow-indigo-100 disabled:bg-slate-300">3. 開始執行</button>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          {/* 左側：編輯清單 */}
+          <div className="xl:col-span-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[750px]">
+            <div className="px-8 py-5 border-b bg-slate-50 flex justify-between items-center">
+              <div className="flex flex-col">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <TableIcon size={14} /> 當前檔案：{fileName || '尚未匯入'}
+                </span>
+                <span className="text-[9px] text-slate-400 mt-1 font-mono">ENCODING: {detectedEncoding}</span>
+              </div>
+              {validationStatus === 'failed' && <span className="text-rose-500 text-[11px] font-bold animate-pulse">檢核失敗：請修正紅框欄位</span>}
+            </div>
+            
+            <div className="flex-1 overflow-auto custom-scrollbar">
+              <table className="w-full text-left text-xs table-fixed min-w-[1100px]">
+                <thead className="sticky top-0 bg-white border-b z-10 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                  <tr>
+                    <th className="px-6 py-4 w-12">#</th>
+                    <th className="px-4 py-4 w-48">商店名稱 (60)</th>
+                    <th className="px-4 py-4 w-32">證號/統編</th>
+                    <th className="px-4 py-4 w-64">英文地址 (Min 30)</th>
+                    <th className="px-4 py-4 w-32">手機號碼</th>
+                    <th className="px-4 py-4 w-24 text-center">API結果</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {csvData.length === 0 ? (
+                    <tr><td colSpan="6" className="py-40 text-center text-slate-300 italic">點擊上方按鈕匯入資料開始編輯</td></tr>
+                  ) : (
+                    csvData.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 text-slate-300 font-mono font-bold">{idx + 1}</td>
+                        <td className="px-2 py-2">
+                          <input 
+                            value={row.MerchantName} 
+                            onChange={e => handleCellEdit(idx, 'MerchantName', e.target.value)}
+                            className={`w-full px-3 py-2 rounded-xl bg-transparent focus:bg-white outline-none border border-transparent focus:border-indigo-200 font-bold text-slate-700 ${errorMap[`${idx}-MerchantName`] ? 'error-cell' : ''}`} 
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input 
+                            value={row.MemberUnified} 
+                            onChange={e => handleCellEdit(idx, 'MemberUnified', e.target.value)}
+                            className={`w-full px-3 py-2 rounded-xl bg-transparent focus:bg-white outline-none border border-transparent focus:border-indigo-200 font-mono ${errorMap[`${idx}-MemberUnified`] ? 'error-cell' : ''}`} 
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input 
+                            value={row.MerchantEnAddr} 
+                            onChange={e => handleCellEdit(idx, 'MerchantEnAddr', e.target.value)}
+                            className={`w-full px-3 py-2 rounded-xl bg-transparent focus:bg-white outline-none border border-transparent focus:border-indigo-200 text-[10px] text-slate-500 ${errorMap[`${idx}-MerchantEnAddr`] ? 'error-cell' : ''}`} 
+                          />
+                        </td>
+                        <td className="px-2 py-2">
+                          <input 
+                            value={row.ManagerMobile} 
+                            onChange={e => handleCellEdit(idx, 'ManagerMobile', e.target.value)}
+                            className={`w-full px-3 py-2 rounded-xl bg-transparent focus:bg-white outline-none border border-transparent focus:border-indigo-200 font-mono ${errorMap[`${idx}-ManagerMobile`] ? 'error-cell' : ''}`} 
+                          />
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          {results[idx] ? (
+                            <button onClick={() => setSelectedJson(results[idx])} className={`px-2 py-1 rounded font-bold text-[9px] border ${results[idx].Status === 'SUCCESS' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-rose-200 text-rose-600 bg-rose-50'}`}>JSON</button>
+                          ) : <span className="text-slate-200 italic">待機</span>}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {processing && (
+              <div className="p-4 bg-indigo-600 text-white font-bold text-[10px] flex justify-between relative overflow-hidden">
+                 <span className="z-10 animate-pulse flex items-center gap-2"><Loader2 size={12} className="animate-spin" /> 正在向藍新 API 批次傳送中...</span>
+                 <div className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all" style={{width: `${progress}%`}}></div>
+              </div>
+            )}
+          </div>
+
+          {/* 右側：雲端即時監控 */}
+          <div className="xl:col-span-4 bg-slate-900 rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col h-[750px] text-slate-300">
+            <div className="px-8 py-6 border-b border-slate-800 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${cloudEnabled ? 'bg-emerald-500 animate-ping' : 'bg-slate-700'}`}></div>
+                <span className="text-xs font-black uppercase text-white tracking-widest">Firestore Live Feed</span>
+              </div>
+              <span className="text-[9px] text-slate-500 font-mono">{cloudEnabled ? 'SYNCING' : 'OFFLINE'}</span>
+            </div>
+            
+            <div className="flex-1 overflow-auto custom-scrollbar p-6 space-y-4">
+              {!cloudEnabled ? (
+                <div className="text-center py-40 text-slate-700 border-2 border-dashed border-slate-800 rounded-[2rem] px-10">
+                   <p className="font-bold text-sm text-slate-500 mb-2">雲端監控尚未就緒</p>
+                   <p className="text-[10px] italic text-slate-600 leading-relaxed">
+                     後端改佈署至雲端平台並正確設定 FIREBASE_CONFIG 後，此處將顯示審核狀態的即時更新。
+                   </p>
                 </div>
-            );
-        };
+              ) : dbRecords.length === 0 ? (
+                <div className="text-center py-40 text-slate-600 italic">資料庫目前無任何紀錄</div>
+              ) : (
+                dbRecords.map(rec => (
+                  <div key={rec.id} className="bg-white/5 border border-white/5 p-5 rounded-3xl hover:bg-white/10 transition-all group">
+                    <div className="flex justify-between items-start mb-2">
+                       <span className="text-[10px] text-indigo-400 font-mono">{rec.updatedAt?.toDate().toLocaleTimeString()}</span>
+                       <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${rec.webhookStatus === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                         {rec.webhookStatus ? '審核完成' : '已傳送API'}
+                       </span>
+                    </div>
+                    <div className="text-sm font-bold text-white mb-1 truncate">{rec.merchantName}</div>
+                    <div className="text-[9px] text-slate-500 font-mono mb-3">{rec.merchantID}</div>
+                    <button onClick={() => setSelectedJson(rec.webhookRaw || rec.syncRaw)} className="text-[9px] text-indigo-500 underline opacity-0 group-hover:opacity-100 transition-opacity">解析原始資料包</button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+      {/* JSON 解析 Modal */}
+      {selectedJson && (
+        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-50 flex items-center justify-center p-6" onClick={() => setSelectedJson(null)}>
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[85%] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-10 py-8 border-b flex justify-between items-center bg-slate-50">
+              <h2 className="text-xl font-black text-slate-800">藍新回應 JSON 解析</h2>
+              <button onClick={() => setSelectedJson(null)} className="text-slate-400 hover:text-slate-900 font-black px-4 py-2 hover:bg-slate-100 rounded-xl transition-all">關閉</button>
+            </div>
+            <div className="flex-1 overflow-auto p-10 code-font text-xs">
+              <pre className="bg-slate-900 text-indigo-300 p-8 rounded-[2rem] leading-relaxed overflow-x-auto shadow-inner">
+                {JSON.stringify(selectedJson, null, 4)}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
 
