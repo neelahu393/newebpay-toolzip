@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NewebPay Batch Pro - 結果匯出版</title>
+    <title>NewebPay Batch Pro - 完整功能版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -41,7 +41,6 @@
             Download: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>,
             ShieldCheck: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4"/></svg>,
             Activity: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
-            CheckCircle: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3"/></svg>,
             Key: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3L15.5 7.5z"/></svg>,
             WifiOff: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
         };
@@ -80,7 +79,6 @@
             }
           }, []);
 
-          // --- 核心：雙引號相容 CSV 解析器 ---
           const parseCSVLine = (text) => {
             const result = [];
             let cell = '';
@@ -122,8 +120,10 @@
                 const reader = new zip.ZipReader(new zip.BlobReader(file));
                 const entries = await reader.getEntries();
                 const csvEntry = entries.find(e => e.filename.toLowerCase().endsWith('.csv'));
-                const data = await csvEntry.getData(new zip.Uint8ArrayWriter(), { password: zipPassword });
-                decodeAndProcess(data);
+                if (csvEntry) {
+                   const data = await csvEntry.getData(new zip.Uint8ArrayWriter(), { password: zipPassword });
+                   decodeAndProcess(data);
+                }
                 await reader.close();
               } catch { alert("ZIP 讀取失敗（可能密碼錯誤）。"); }
             } else {
@@ -146,11 +146,16 @@
                   newErrorMap[`${index}-MerchantName`] = true;
                 }
                 if (!row.MerchantEnAddr || row.MerchantEnAddr.length < 30) {
-                  errors.push({ row: rowIdx, field: "英文地址", msg: "長度需至少 30 字" });
+                  errors.push({ row: rowIdx, field: "英文地址", msg: "需滿 30 字" });
                   newErrorMap[`${index}-MerchantEnAddr`] = true;
                 }
-                if (row.MCType === "1" && row.MemberUnified?.length !== 8) {
-                    errors.push({ row: rowIdx, field: "統編", msg: "應為 8 碼" });
+                const unified = row.MemberUnified || "";
+                if (row.MCType === "1" && unified.length !== 8) {
+                    errors.push({ row: rowIdx, field: "統編", msg: "需為 8 碼" });
+                    newErrorMap[`${index}-MemberUnified`] = true;
+                }
+                if (row.MCType === "3" && unified.length !== 10) {
+                    errors.push({ row: rowIdx, field: "身分證", msg: "需為 10 碼" });
                     newErrorMap[`${index}-MemberUnified`] = true;
                 }
               });
@@ -185,37 +190,25 @@
             setProcessing(false);
           };
 
-          // --- 新增：匯出執行結果為 CSV ---
           const downloadResultsCSV = () => {
             if (results.every(r => r === null)) return;
-            
             const header = ["序號", "商店名稱", "商店代號", "狀態", "訊息"].join(",");
             const rows = csvData.map((data, i) => {
               const res = results[i] || { Status: 'N/A', Message: '未執行' };
-              const row = [
-                i + 1,
-                `"${data.MerchantName}"`,
-                res.TargetMID || data.MerchantID || "N/A",
-                res.Status,
-                `"${res.Message.replace(/"/g, '""')}"` // 逸脫雙引號
-              ];
-              return row.join(",");
+              return [i + 1, `"${data.MerchantName}"`, res.TargetMID || data.MerchantID || "N/A", res.Status, `"${res.Message.replace(/"/g, '""')}"`].join(",");
             });
-            
-            const csvContent = "\ufeff" + [header, ...rows].join("\n"); // 加 BOM 防止 Excel 亂碼
+            const csvContent = "\ufeff" + [header, ...rows].join("\n");
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `NewebPay_Batch_Results_${new Date().getTime()}.csv`);
-            document.body.appendChild(link);
+            link.href = url;
+            link.download = `NewebPay_Results_${new Date().getTime()}.csv`;
             link.click();
-            document.body.removeChild(link);
           };
 
           return (
             <div className="min-h-screen bg-slate-50 p-4 md:p-8 text-slate-900">
-              <div className="max-w-[1500px] mx-auto space-y-6">
+              <div className="max-w-[1600px] mx-auto space-y-6">
                 <header className="bg-white p-8 rounded-[2.5rem] border shadow-sm flex flex-col lg:flex-row justify-between items-center gap-6">
                   <div className="flex items-center gap-5">
                     <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-xl"><Icons.Archive size={32} /></div>
@@ -230,7 +223,6 @@
                       </div>
                     </div>
                   </div>
-                  
                   <div className="flex flex-wrap gap-3 items-end">
                      <div className="flex flex-col">
                         <label className="text-[9px] font-bold text-slate-400 mb-1 ml-1 flex items-center gap-1 uppercase tracking-widest"><Icons.Key size={10} /> ZIP Pwd</label>
@@ -245,33 +237,43 @@
                         <input type="file" accept=".csv,.zip" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
                      </div>
                      <button onClick={performValidation} disabled={csvData.length === 0} className="bg-emerald-50 text-emerald-600 border border-emerald-100 px-6 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-100 disabled:opacity-50">2. 檢核</button>
-                     <button onClick={runBatch} disabled={processing || validationStatus !== 'passed'} className="bg-indigo-600 text-white px-10 py-2.5 rounded-2xl font-bold text-sm shadow-xl disabled:bg-slate-300 transition-all">3. 開始執行</button>
+                     <button onClick={runBatch} disabled={processing || validationStatus !== 'passed'} className="bg-indigo-600 text-white px-10 py-2.5 rounded-2xl font-bold text-sm shadow-xl disabled:bg-slate-300 transition-all">3. 執行批次</button>
                   </div>
                 </header>
 
-                <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-                  <div className="xl:col-span-3 bg-white rounded-[2.5rem] border overflow-hidden flex flex-col h-[700px] shadow-sm">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                  <div className="xl:col-span-9 bg-white rounded-[2.5rem] border overflow-hidden flex flex-col h-[700px] shadow-sm">
                     <div className="px-8 py-5 border-b bg-slate-50 flex justify-between items-center">
-                       <span className="text-xs font-black text-slate-500 uppercase tracking-widest">檔案：{fileName || '未匯入'}</span>
+                       <span className="text-xs font-black text-slate-500 uppercase tracking-widest">商店編輯清單：{fileName || '等待匯入'}</span>
                        {processing && <span className="text-indigo-600 font-bold text-xs animate-pulse">批次傳送中 {Math.round(progress)}%</span>}
                     </div>
                     <div className="flex-1 overflow-auto custom-scrollbar">
-                      <table className="w-full text-left text-xs table-fixed min-w-[1100px]">
+                      <table className="w-full text-left text-[11px] table-fixed min-w-[1300px]">
                         <thead className="sticky top-0 bg-white border-b z-10 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                          <tr><th className="px-6 py-4 w-12">#</th><th className="px-4 py-4 w-48">商店名稱</th><th className="px-4 py-4 w-64">英文地址 (Min 30)</th><th className="px-4 py-4 w-32">手機</th><th className="px-4 py-4 w-24 text-center">API 狀態</th></tr>
+                          <tr>
+                             <th className="px-6 py-4 w-12">#</th>
+                             <th className="px-2 py-4 w-32">商店代號</th>
+                             <th className="px-2 py-4 w-48">商店名稱</th>
+                             <th className="px-2 py-4 w-32">證號/統編</th>
+                             <th className="px-2 py-4 w-64">英文地址 (Min 30)</th>
+                             <th className="px-2 py-4 w-32">手機號碼</th>
+                             <th className="px-4 py-4 w-24 text-center">結果</th>
+                          </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {csvData.length === 0 ? (
-                            <tr><td colSpan="5" className="py-40 text-center text-slate-300 italic font-bold">點擊按鈕匯入資料開始作業...</td></tr>
+                            <tr><td colSpan="7" className="py-40 text-center text-slate-300 italic font-bold">尚未匯入資料</td></tr>
                           ) : (
                             csvData.map((row, idx) => (
                               <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                                 <td className="px-6 py-4 text-slate-300 font-bold font-mono">{idx + 1}</td>
+                                <td className="px-2 py-2 font-mono text-slate-400 truncate">{results[idx]?.TargetMID || row.MerchantID || '(自動生成)'}</td>
                                 <td className={`px-2 py-2 font-bold ${errorMap[`${idx}-MerchantName`] ? 'error-cell' : 'text-slate-700'}`}>{row.MerchantName}</td>
+                                <td className={`px-2 py-2 font-mono ${errorMap[`${idx}-MemberUnified`] ? 'error-cell' : 'text-slate-600'}`}>{row.MemberUnified}</td>
                                 <td className={`px-2 py-2 text-[10px] text-slate-500 truncate ${errorMap[`${idx}-MerchantEnAddr`] ? 'error-cell' : ''}`}>{row.MerchantEnAddr}</td>
                                 <td className="px-2 py-2 font-mono text-slate-600">{row.ManagerMobile}</td>
                                 <td className="px-4 py-4 text-center">
-                                  {results[idx] ? <span onClick={() => setSelectedJson(results[idx])} className={`px-2 py-1 rounded font-black text-[9px] border cursor-pointer transition-all hover:scale-105 ${results[idx].Status === 'SUCCESS' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-rose-200 text-rose-600 bg-rose-50'}`}>{results[idx].Status}</span> : <span className="text-slate-200 italic font-mono uppercase text-[9px]">WAIT</span>}
+                                  {results[idx] ? <span onClick={() => setSelectedJson(results[idx])} className={`px-2 py-1 rounded font-black text-[9px] border cursor-pointer transition-all hover:scale-105 active:scale-95 ${results[idx].Status === 'SUCCESS' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-rose-200 text-rose-600 bg-rose-50'}`}>{results[idx].Status}</span> : <span className="text-slate-200 italic font-mono uppercase text-[9px]">WAIT</span>}
                                 </td>
                               </tr>
                             ))
@@ -281,25 +283,25 @@
                     </div>
                   </div>
 
-                  <div className="xl:col-span-1 space-y-4 flex flex-col h-[700px]">
+                  <div className="xl:col-span-3 space-y-4 flex flex-col h-[700px]">
                     <div className="bg-white rounded-[2.5rem] border p-6 flex-1 flex flex-col overflow-hidden shadow-sm">
                        <div className="flex justify-between items-center mb-5">
-                          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Icons.Activity size={14} className="text-indigo-500" /> API 即時結果</h3>
+                          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Icons.Activity size={14} className="text-indigo-500" /> 執行與結果</h3>
                           {results.some(r => r !== null) && (
-                             <button onClick={downloadResultsCSV} className="text-indigo-600 hover:text-indigo-800 transition-colors p-1" title="下載報表">
+                             <button onClick={downloadResultsCSV} className="text-indigo-600 hover:text-indigo-800 transition-all p-1.5 rounded-full bg-indigo-50" title="下載完整回覆報表">
                                <Icons.Download size={16} />
                              </button>
                           )}
                        </div>
-                       <div className="flex-1 overflow-auto custom-scrollbar space-y-3 pr-2">
+                       <div className="flex-1 overflow-auto custom-scrollbar space-y-3 pr-2 text-xs">
                           {validationStatus === 'failed' && validationErrors.map((err, i) => (
-                              <div key={i} className="bg-rose-50 p-3 rounded-2xl text-[10px] text-rose-600 font-bold border border-rose-100 shadow-sm animate-in slide-in-from-right-1">
+                              <div key={i} className="bg-rose-50 p-3 rounded-2xl text-[10px] text-rose-600 font-bold border border-rose-100 shadow-sm">
                                 <span className="font-black">列 {err.row}:</span> [{err.field}] {err.msg}
                               </div>
                           ))}
-                          {results.length === 0 && validationStatus !== 'failed' && <div className="text-slate-300 text-[11px] italic text-center py-20 border-2 border-dashed rounded-3xl">等待執行結果...</div>}
+                          {results.length === 0 && validationStatus !== 'failed' && <div className="text-slate-300 italic text-center py-20 border-2 border-dashed rounded-3xl">等待執行...</div>}
                           {results.map((res, i) => res && (
-                              <div key={i} onClick={() => setSelectedJson(res)} className={`p-4 rounded-2xl border cursor-pointer hover:bg-slate-50 transition-all shadow-sm ${res.Status === 'SUCCESS' ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+                              <div key={i} onClick={() => setSelectedJson(res)} className={`p-4 rounded-2xl border cursor-pointer hover:bg-slate-50 transition-all ${res.Status === 'SUCCESS' ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
                                 <div className="text-[9px] font-black text-slate-400 flex justify-between mb-1 uppercase">
                                    <span>商店 #{i+1}</span>
                                    <span className={res.Status === 'SUCCESS' ? 'text-emerald-600' : 'text-rose-600'}>{res.Status}</span>
@@ -319,7 +321,7 @@
                   <div className="bg-white w-full max-w-2xl rounded-[3rem] p-10 max-h-[85%] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
                     <div className="flex justify-between items-center mb-6">
                        <h2 className="text-xl font-black flex items-center gap-3"><Icons.ShieldCheck className="text-indigo-600" size={24} /> API 完整回應</h2>
-                       <button onClick={() => setSelectedJson(null)} className="text-slate-400 font-bold bg-slate-100 px-4 py-2 rounded-full text-xs">CLOSE</button>
+                       <button onClick={() => setSelectedJson(null)} className="text-slate-400 font-bold bg-slate-100 px-4 py-2 rounded-full text-xs hover:text-slate-800 transition-colors">CLOSE</button>
                     </div>
                     <pre className="flex-1 overflow-auto bg-slate-900 text-indigo-300 p-8 rounded-[2rem] text-[11px] leading-relaxed custom-scrollbar font-mono shadow-inner border border-white/5">
                         {JSON.stringify(selectedJson, null, 4)}
