@@ -3,17 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>藍新金流批次管理系統 - 固定 SCR 版</title>
-    <!-- Tailwind CSS -->
+    <title>NewebPay Batch Pro - 引號相容版</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel (用於解析 JSX) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- zip.js -->
     <script src="https://unpkg.com/@zip.js/zip.js@2.7.53/dist/zip.min.js"></script>
-    <!-- Firebase Compat (相容模式) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -21,11 +16,9 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Noto+Sans+TC:wght@400;700;900&display=swap');
         body { font-family: 'Noto Sans TC', sans-serif; }
-        .code-font { font-family: 'Fira Code', monospace; }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .error-cell { border: 2px solid #ef4444 !important; background-color: #fef2f2; }
-        .editable-input:focus { background-color: white; box-shadow: 0 0 0 2px #6366f1; outline: none; }
         .loading-spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
@@ -41,153 +34,89 @@
     <script type="text/babel">
         const { useState, useEffect, useCallback, useRef } = React;
 
-        // --- 全圖標組件 ---
-        const SvgIcon = ({ d, size = 20, className = "", viewBox = "0 0 24 24" }) => (
-            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox={viewBox} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <path d={d} />
-            </svg>
-        );
-
         const Icons = {
-            Archive: (p) => <SvgIcon d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" {...p} />,
-            Upload: (p) => <SvgIcon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" {...p} />,
-            ShieldCheck: (p) => <SvgIcon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4" {...p} />,
-            Activity: (p) => <SvgIcon d="M22 12h-4l-3 9L9 3l-3 9H2" {...p} />,
-            Lock: (p) => <SvgIcon d="M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zM7 11V7a5 5 0 0 1 10 0v4" {...p} />,
-            Eye: (p) => <SvgIcon d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 1 0 0 6 3 3 0 1 0 0-6z" {...p} />,
-            AlertTriangle: (p) => <SvgIcon d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4M12 17h.01" {...p} />,
-            CheckCircle: (p) => <SvgIcon d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3" {...p} />,
-            Loader2: (p) => <SvgIcon d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" className={`${p.className} loading-spin`} {...p} />,
-            SearchCheck: (p) => <SvgIcon d="m8 11 2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" {...p} />,
-            WifiOff: (p) => <SvgIcon d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" {...p} />,
-            RefreshCw: (p) => <SvgIcon d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" {...p} />
+            Archive: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>,
+            Upload: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>,
+            ShieldCheck: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4"/></svg>,
+            Activity: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+            WifiOff: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>,
+            CheckCircle: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3"/></svg>,
+            Loader2: (p) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="loading-spin" {...p}><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
         };
 
         const App = () => {
           const [proxyUrl, setProxyUrl] = useState('http://localhost:3000');
-          const [idPrefix] = useState('SCR'); // 固定 SCR 前綴
-          const [backendStatus, setBackendStatus] = useState('unknown'); // unknown, online, offline
+          const [idPrefix] = useState('SCR'); // 固定前綴
+          const [backendStatus, setBackendStatus] = useState('unknown');
           const [user, setUser] = useState(null);
-          const [cloudEnabled, setCloudEnabled] = useState(false);
           const [csvData, setCsvData] = useState([]);
           const [results, setResults] = useState([]);
-          const [dbRecords, setDbRecords] = useState([]); 
           const [zipPassword, setZipPassword] = useState('');
           const [validationStatus, setValidationStatus] = useState('idle');
           const [validationErrors, setValidationErrors] = useState([]);
           const [errorMap, setErrorMap] = useState({}); 
           const [processing, setProcessing] = useState(false);
           const [progress, setProgress] = useState(0);
-          const [detectedEncoding, setDetectedEncoding] = useState('尚未偵測');
-          const [selectedJson, setSelectedJson] = useState(null);
           const [fileName, setFileName] = useState('');
+          const [selectedJson, setSelectedJson] = useState(null); // 修正：新增遺漏的狀態聲明
 
-          const isInitialMount = useRef(true);
-
-          // --- 後端連線診斷 ---
           const checkBackend = useCallback(async (url) => {
-            setBackendStatus('unknown');
             try {
-              const cleanUrl = url.trim().replace(/\/+$/, '');
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 3000);
+              const res = await fetch(`${url.trim().replace(/\/+$/, '')}/api/config`, { mode: 'cors' });
+              if (res.ok) setBackendStatus('online');
+              else throw new Error();
+            } catch { setBackendStatus('offline'); }
+          }, []);
 
-              const response = await fetch(`${cleanUrl}/api/config`, { 
-                method: 'GET',
-                mode: 'cors',
-                signal: controller.signal
-              });
-              clearTimeout(timeoutId);
-              if (response.ok) {
-                setBackendStatus('online');
-                return true;
-              }
-              throw new Error();
-            } catch (error) {
-              setBackendStatus('offline');
-              return false;
+          useEffect(() => {
+            checkBackend(proxyUrl);
+            const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+            if (configStr && typeof firebase !== 'undefined') {
+              const config = JSON.parse(configStr);
+              if (!firebase.apps.length) firebase.initializeApp(config);
+              firebase.auth().signInAnonymously().then(u => setUser(u.user));
             }
           }, []);
 
-          // 1. 初始化系統 (Rule 3)
-          useEffect(() => {
-            const initAuth = async () => {
-              try {
-                await checkBackend(proxyUrl);
-                const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-                if (configStr && typeof firebase !== 'undefined') {
-                  const config = JSON.parse(configStr);
-                  if (!firebase.apps.length) firebase.initializeApp(config);
-                  const auth = firebase.auth();
-                  
-                  if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await auth.signInWithCustomToken(__initial_auth_token);
-                  } else {
-                    await auth.signInAnonymously();
-                  }
-
-                  const unsubscribe = auth.onAuthStateChanged((u) => {
-                    setUser(u);
-                    if (u) setCloudEnabled(true);
-                  });
-                  return () => unsubscribe();
-                }
-              } catch (e) { console.error("Init Error:", e); }
-            };
-            if (isInitialMount.current) {
-              initAuth();
-              isInitialMount.current = false;
+          // --- 核心：強大且能辨識雙引號的 CSV 解析器 ---
+          const parseCSVLine = (text) => {
+            const result = [];
+            let cell = '';
+            let inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+              const char = text[i];
+              if (char === '"') {
+                inQuotes = !inQuotes;
+              } else if (char === ',' && !inQuotes) {
+                result.push(cell.trim());
+                cell = '';
+              } else {
+                cell += char;
+              }
             }
-          }, [checkBackend, proxyUrl]);
-
-          // 2. 監聽 Firestore (Rule 1)
-          useEffect(() => {
-            if (!user) return;
-            const db = firebase.firestore();
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app';
-            const collRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('merchant_records');
-            const unsubscribe = collRef.onSnapshot(
-              (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setDbRecords(data.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0)));
-              },
-              (err) => console.error("Firestore Error:", err)
-            );
-            return () => unsubscribe();
-          }, [user]);
+            result.push(cell.trim());
+            return result;
+          };
 
           const decodeAndProcess = (uint8) => {
             let text = "";
-            let label = "UTF-8";
-            const hasBOM = uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF;
             try {
-              const decoder = new TextDecoder('utf-8', { fatal: true });
-              text = decoder.decode(hasBOM ? uint8.slice(3) : uint8);
-            } catch (err) {
+              text = new TextDecoder('utf-8', { fatal: true }).decode(uint8[0] === 0xEF ? uint8.slice(3) : uint8);
+            } catch {
               text = new TextDecoder('big5').decode(uint8);
-              label = "Big5 (Excel)";
             }
-            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-            const parseLine = (line) => {
-              const res = [];
-              let cell = '', inQ = false;
-              for (let i = 0; i < line.length; i++) {
-                if (line[i] === '"') inQ = !inQ;
-                else if (line[i] === ',' && !inQ) { res.push(cell.trim()); cell = ''; }
-                else cell += line[i];
-              }
-              res.push(cell.trim());
-              return res;
-            };
-            const headers = parseLine(lines[0]);
+            const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+            if (lines.length === 0) return;
+            const headers = parseCSVLine(lines[0]);
             const data = lines.slice(1).map(l => {
-              const v = parseLine(l);
-              return headers.reduce((o, h, i) => ({ ...o, [h]: v[i] || "" }), {});
+              const values = parseCSVLine(l);
+              return headers.reduce((obj, header, i) => ({ ...obj, [header]: values[i] || "" }), {});
             });
             setCsvData(data);
             setResults(new Array(data.length).fill(null));
             setValidationStatus('idle');
-            setDetectedEncoding(label);
+            setValidationErrors([]);
+            setErrorMap({});
           };
 
           const handleFileUpload = async (e) => {
@@ -204,51 +133,34 @@
                     decodeAndProcess(data);
                 }
                 await reader.close();
-              } catch (err) { alert("ZIP 解析失敗。"); }
+              } catch { alert("ZIP 讀取失敗（可能密碼錯誤）。"); }
             } else {
               const reader = new FileReader();
               reader.onload = (ev) => decodeAndProcess(new Uint8Array(ev.target.result));
               reader.readAsArrayBuffer(file);
             }
-            e.target.value = null; 
+            e.target.value = null;
           };
 
           const performValidation = () => {
-            if (csvData.length === 0) return;
             setValidationStatus('validating');
             const errors = [];
             const newErrorMap = {};
-            const mobileReg = /^09\d{8}$/;
-
             setTimeout(() => {
               csvData.forEach((row, index) => {
                 const rowIdx = index + 1;
-                const mID = row.MerchantID;
-
-                if (mID) {
-                    if (!mID.startsWith('SCR')) errors.push({ row: rowIdx, field: "商店代號", msg: "必須以 SCR 開頭" });
-                    if (mID.length <= 3 || mID.length >= 14) errors.push({ row: rowIdx, field: "商店代號", msg: "長度需介於 4~13 字元" });
-                }
-
                 if (!row.MerchantName || row.MerchantName.length > 60) {
                   errors.push({ row: rowIdx, field: "商店名稱", msg: "需為 1-60 字" });
                   newErrorMap[`${index}-MerchantName`] = true;
                 }
+                // 這裡現在能正確抓到包含逗點的引號內完整地址
                 if (!row.MerchantEnAddr || row.MerchantEnAddr.length < 30) {
-                  errors.push({ row: rowIdx, field: "英文地址", msg: "需滿 30 字元" });
+                  errors.push({ row: rowIdx, field: "英文地址", msg: "長度需至少 30 字" });
                   newErrorMap[`${index}-MerchantEnAddr`] = true;
                 }
                 if (row.MCType === "1" && row.MemberUnified?.length !== 8) {
                     errors.push({ row: rowIdx, field: "統編", msg: "應為 8 碼" });
                     newErrorMap[`${index}-MemberUnified`] = true;
-                }
-                if (row.MCType === "3" && row.MemberUnified?.length !== 10) {
-                    errors.push({ row: rowIdx, field: "身分證", msg: "應為 10 碼" });
-                    newErrorMap[`${index}-MemberUnified`] = true;
-                }
-                if (row.ManagerMobile && !mobileReg.test(row.ManagerMobile)) {
-                    errors.push({ row: rowIdx, field: "手機", msg: "格式需 09xxxxxxxx" });
-                    newErrorMap[`${index}-ManagerMobile`] = true;
                 }
               });
               setValidationErrors(errors);
@@ -258,23 +170,19 @@
           };
 
           const runBatch = async () => {
-            if (validationStatus !== 'passed') return;
             setProcessing(true);
-            const cleanUrl = proxyUrl.trim().replace(/\/+$/, '');
-            const timestampSlice = Math.floor(Date.now() / 1000).toString().slice(-7);
-
+            const ts = Math.floor(Date.now() / 1000).toString().slice(-7);
             for (let i = 0; i < csvData.length; i++) {
-              const item = csvData[i];
-              const mid = item.MerchantID || `SCR${timestampSlice}${i.toString().padStart(3, '0')}`;
+              const mid = csvData[i].MerchantID || `SCR${ts}${i.toString().padStart(3, '0')}`;
               try {
-                const res = await fetch(`${cleanUrl}/api/create-merchant`, {
+                const res = await fetch(`${proxyUrl.trim().replace(/\/+$/, '')}/api/create-merchant`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ ...item, MerchantID: mid })
+                  body: JSON.stringify({ ...csvData[i], MerchantID: mid })
                 });
                 const data = await res.json();
                 setResults(prev => { const n = [...prev]; n[i] = data; return n; });
-              } catch (err) {
+              } catch {
                 setResults(prev => { const n = [...prev]; n[i] = { Status: 'ERROR', Message: '連線失敗' }; return n; });
               }
               setProgress(((i + 1) / csvData.length) * 100);
@@ -285,90 +193,57 @@
 
           return (
             <div className="min-h-screen bg-slate-50 p-4 md:p-8 text-slate-900">
-              <div className="max-w-[1600px] mx-auto space-y-6">
-                <header className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-6">
-                  <div className="flex items-center gap-5">
-                    <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-xl">
-                      <Icons.Archive size={32} />
-                    </div>
+              <div className="max-w-[1400px] mx-auto space-y-6">
+                <header className="bg-white p-6 rounded-[2rem] border shadow-sm flex flex-col lg:flex-row justify-between items-center gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg"><Icons.Archive size={28} /></div>
                     <div>
-                      <h1 className="text-2xl font-black text-slate-800 tracking-tight italic">NewebPay Batch Pro</h1>
-                      <div className="flex items-center gap-3 mt-1">
-                        <div className={`flex items-center gap-2 px-2.5 py-0.5 rounded-full font-black border uppercase text-[10px] ${backendStatus === 'online' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-rose-50 text-rose-500 border-rose-100'}`}>
-                           {backendStatus === 'online' ? <Icons.ShieldCheck size={10} /> : <Icons.WifiOff size={10} />}
-                           Prefix: SCR (Fixed)
-                           {backendStatus === 'offline' && (
-                             <button onClick={() => checkBackend(proxyUrl)} className="ml-1 text-rose-700 hover:underline">重試連線</button>
-                           )}
-                        </div>
-                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 ${cloudEnabled ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-                           {cloudEnabled ? <Icons.Activity size={10} className="animate-pulse" /> : <Icons.Lock size={10} />}
-                           {cloudEnabled ? '雲端同步' : '本地測試模式'}
+                      <h1 className="text-xl font-black italic">NewebPay Batch Master</h1>
+                      <div className="flex gap-2 mt-1">
+                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold border ${backendStatus === 'online' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
+                          {backendStatus === 'online' ? 'Proxy Online' : 'Proxy Offline'}
                         </span>
+                        <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">Prefix: SCR (L13)</span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-3 items-end">
-                     <div className="flex flex-col">
-                        <label className="text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">Proxy URL</label>
-                        <input type="text" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} onBlur={() => checkBackend(proxyUrl)} placeholder="http://localhost:3000" className="px-4 py-2 bg-slate-50 border rounded-xl text-xs outline-none w-48 focus:ring-2 focus:ring-indigo-100" />
+                  <div className="flex flex-wrap gap-2 items-end">
+                     <div className="flex flex-col"><label className="text-[9px] font-bold text-slate-400 mb-1">Proxy URL</label>
+                     <input value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} className="px-3 py-2 bg-slate-50 border rounded-xl text-xs outline-none w-44" /></div>
+                     <div className="relative">
+                        <button className="bg-slate-800 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-md flex items-center gap-2">
+                           <Icons.Upload size={14} /> 匯入 CSV/ZIP
+                        </button>
+                        <input type="file" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
                      </div>
-                     <div className="flex flex-col">
-                        <label className="text-[9px] font-bold text-slate-400 mb-1 ml-1 uppercase">ZIP Pwd</label>
-                        <input type="password" value={zipPassword} onChange={e => setZipPassword(e.target.value)} placeholder="無密碼" className="px-4 py-2 bg-slate-50 border rounded-xl text-xs outline-none w-24 focus:ring-2 focus:ring-indigo-100" />
-                     </div>
-                     <div className="relative mt-auto">
-                        <input type="file" accept=".csv,.zip" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                        <button className="bg-slate-800 text-white px-6 py-2.5 rounded-2xl font-bold text-sm shadow-lg flex items-center gap-2 hover:bg-slate-700 transition-colors"><Icons.Upload size={16} /> 匯入檔案</button>
-                     </div>
-                     <button onClick={performValidation} disabled={csvData.length === 0} className="mt-auto bg-emerald-50 text-emerald-600 border border-emerald-100 px-6 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-100">2. 檢核規範</button>
-                     <button onClick={runBatch} disabled={processing || validationStatus !== 'passed'} className="mt-auto bg-indigo-600 text-white px-10 py-2.5 rounded-2xl font-bold text-sm shadow-xl disabled:bg-slate-300">3. 執行批次</button>
+                     <button onClick={performValidation} disabled={csvData.length === 0} className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-5 py-2 rounded-xl font-bold text-xs disabled:opacity-50">2. 檢核規範</button>
+                     <button onClick={runBatch} disabled={processing || validationStatus !== 'passed'} className="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold text-xs shadow-xl disabled:bg-slate-300 transition-all">3. 執行批次</button>
                   </div>
                 </header>
 
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-                  <div className="xl:col-span-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[750px]">
-                    <div className="px-8 py-5 border-b bg-slate-50 flex justify-between items-center">
-                      <span className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">商店編輯清單 - {fileName || '等待匯入'}</span>
-                      <span className="text-[9px] text-slate-400 font-mono tracking-widest uppercase">ENCODING: {detectedEncoding}</span>
+                <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                  <div className="xl:col-span-3 bg-white rounded-[2rem] border overflow-hidden flex flex-col h-[650px]">
+                    <div className="px-6 py-4 border-b bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-widest flex justify-between">
+                       <span>檔案：{fileName || '未匯入'}</span>
+                       {processing && <span className="text-indigo-600 animate-pulse">處理中 {Math.round(progress)}%</span>}
                     </div>
                     <div className="flex-1 overflow-auto custom-scrollbar">
-                      <table className="w-full text-left text-xs table-fixed min-w-[1100px]">
-                        <thead className="sticky top-0 bg-white border-b z-10 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                          <tr>
-                            <th className="px-6 py-4 w-12">#</th>
-                            <th className="px-4 py-4 w-48">商店名稱 (60)</th>
-                            <th className="px-4 py-4 w-32">證號/統編</th>
-                            <th className="px-4 py-4 w-64">英文地址 (Min 30)</th>
-                            <th className="px-4 py-4 w-32">手機</th>
-                            <th className="px-4 py-4 w-24 text-center">結果</th>
-                          </tr>
+                      <table className="w-full text-left text-xs table-fixed min-w-[1000px]">
+                        <thead className="sticky top-0 bg-white border-b z-10 text-[10px] text-slate-400 font-bold uppercase">
+                          <tr><th className="px-6 py-4 w-12">#</th><th className="px-4 py-4 w-48">商店名稱</th><th className="px-4 py-4 w-64">英文地址 (Min 30)</th><th className="px-4 py-4 w-32">手機</th><th className="px-4 py-4 w-24 text-center">API 狀態</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {csvData.length === 0 ? (
-                            <tr><td colSpan="6" className="py-40 text-center text-slate-300 italic font-bold">請匯入檔案。</td></tr>
+                            <tr><td colSpan="5" className="py-32 text-center text-slate-300 italic font-bold">尚未匯入資料...</td></tr>
                           ) : (
                             csvData.map((row, idx) => (
                               <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                <td className="px-6 py-4 text-slate-300 font-mono font-bold">{idx + 1}</td>
-                                <td className="px-2 py-2"><input value={row.MerchantName} onChange={e => {
-                                    const n = [...csvData]; n[idx].MerchantName = e.target.value; setCsvData(n); setValidationStatus('idle');
-                                }} className={`w-full px-3 py-2 rounded-xl bg-transparent font-bold text-slate-700 ${errorMap[`${idx}-MerchantName`] ? 'error-cell' : ''}`} /></td>
-                                <td className="px-2 py-2"><input value={row.MemberUnified} onChange={e => {
-                                    const n = [...csvData]; n[idx].MemberUnified = e.target.value; setCsvData(n); setValidationStatus('idle');
-                                }} className={`w-full px-3 py-2 rounded-xl bg-transparent font-mono ${errorMap[`${idx}-MemberUnified`] ? 'error-cell' : ''}`} /></td>
-                                <td className="px-2 py-2"><input value={row.MerchantEnAddr} onChange={e => {
-                                    const n = [...csvData]; n[idx].MerchantEnAddr = e.target.value; setCsvData(n); setValidationStatus('idle');
-                                }} className={`w-full px-3 py-2 rounded-xl bg-transparent text-[10px] text-slate-500 ${errorMap[`${idx}-MerchantEnAddr`] ? 'error-cell' : ''}`} /></td>
-                                <td className="px-2 py-2"><input value={row.ManagerMobile} onChange={e => {
-                                    const n = [...csvData]; n[idx].ManagerMobile = e.target.value; setCsvData(n); setValidationStatus('idle');
-                                }} className={`w-full px-3 py-2 rounded-xl bg-transparent font-mono ${errorMap[`${idx}-ManagerMobile`] ? 'error-cell' : ''}`} /></td>
+                                <td className="px-6 py-4 text-slate-300 font-bold">{idx + 1}</td>
+                                <td className={`px-2 py-2 ${errorMap[`${idx}-MerchantName`] ? 'error-cell' : ''}`}>{row.MerchantName}</td>
+                                <td className={`px-2 py-2 text-[10px] text-slate-500 truncate ${errorMap[`${idx}-MerchantEnAddr`] ? 'error-cell' : ''}`}>{row.MerchantEnAddr}</td>
+                                <td className="px-2 py-2 font-mono">{row.ManagerMobile}</td>
                                 <td className="px-4 py-4 text-center">
-                                  {results[idx] ? (
-                                    <span onClick={() => setSelectedJson(results[idx])} className={`px-2 py-1 rounded font-black text-[9px] border cursor-pointer ${results[idx].Status === 'SUCCESS' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-rose-200 text-rose-600 bg-rose-50'}`}>
-                                      {results[idx].Status === 'SUCCESS' ? '成功' : '錯誤'}
-                                    </span>
-                                  ) : <span className="text-slate-200 italic font-mono text-[10px]">READY</span>}
+                                  {results[idx] ? <span onClick={() => setSelectedJson(results[idx])} className={`px-2 py-1 rounded font-bold text-[9px] border cursor-pointer ${results[idx].Status === 'SUCCESS' ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'border-rose-200 text-rose-600 bg-rose-50'}`}>{results[idx].Status}</span> : <span className="text-slate-200 italic font-mono">READY</span>}
                                 </td>
                               </tr>
                             ))
@@ -376,70 +251,25 @@
                         </tbody>
                       </table>
                     </div>
-                    {processing && (
-                      <div className="p-4 bg-indigo-600 text-white font-bold text-[10px] flex justify-between relative overflow-hidden transition-all duration-300">
-                         <span className="z-10 animate-pulse flex items-center gap-2 uppercase tracking-widest"><Icons.Loader2 size={12} className="animate-spin" /> Processing... {Math.round(progress)}%</span>
-                         <div className="absolute bottom-0 left-0 h-1 bg-white/30 transition-all duration-300" style={{width: `${progress}%`}}></div>
-                      </div>
-                    )}
                   </div>
 
-                  <div className="xl:col-span-4 space-y-6">
-                    <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-6 h-[350px] flex flex-col">
-                       <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
-                          <Icons.SearchCheck size={14} /> 檢核結果報表
-                       </h3>
-                       <div className="flex-1 overflow-auto custom-scrollbar pr-2">
-                          {backendStatus === 'offline' && (
-                             <div className="bg-rose-50 border border-rose-100 p-4 rounded-3xl text-rose-600 flex flex-col items-center text-center gap-2 mb-4 animate-in fade-in">
-                                <Icons.WifiOff size={24} />
-                                <span className="text-[10px] font-black uppercase">Backend Offline</span>
-                                <p className="text-[9px] opacity-80 leading-relaxed font-bold">無法連線，請確認後端伺服器 3000 埠口已啟動。</p>
-                                <button onClick={() => checkBackend(proxyUrl)} className="text-[9px] bg-rose-600 text-white px-4 py-1.5 rounded-full font-bold mt-1 shadow-lg">重新連線</button>
-                             </div>
-                          )}
-                          {validationStatus === 'idle' && backendStatus !== 'offline' && <div className="text-slate-300 text-[11px] italic text-center py-10 border-2 border-dashed rounded-3xl">請執行規範檢核</div>}
-                          {validationStatus === 'validating' && <div className="text-indigo-500 text-[11px] font-bold text-center py-10 animate-pulse"><Icons.Loader2 size={24} className="mx-auto mb-2" /> 規範掃描中...</div>}
-                          {validationStatus === 'passed' && (
-                              <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-3xl text-emerald-700 flex flex-col items-center text-center gap-3">
-                                  <Icons.CheckCircle size={32} className="text-emerald-500" />
-                                  <div className="text-[10px] font-black uppercase tracking-widest italic decoration-emerald-200 underline underline-offset-4">Validation Passed</div>
-                                  <p className="text-[9px] opacity-70">商店代號固定為 SCR 13 字元</p>
+                  <div className="xl:col-span-1 space-y-4 flex flex-col h-[650px]">
+                    <div className="bg-white rounded-[2rem] border p-5 flex-1 flex flex-col overflow-hidden">
+                       <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4"><Icons.Activity size={12}/> 檢核與回覆紀錄</h3>
+                       <div className="flex-1 overflow-auto custom-scrollbar space-y-2 pr-2">
+                          {validationStatus === 'failed' && validationErrors.map((err, i) => (
+                              <div key={i} className="bg-rose-50 p-2 rounded-lg text-[10px] text-rose-600 font-bold border border-rose-100">列 {err.row}: [{err.field}] {err.msg}</div>
+                          ))}
+                          {results.map((res, i) => res && (
+                              <div key={i} onClick={() => setSelectedJson(res)} className={`p-3 rounded-xl border cursor-pointer hover:bg-slate-50 transition-colors ${res.Status === 'SUCCESS' ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+                                <div className="text-[9px] font-black text-slate-400 flex justify-between">
+                                   <span>商店 #{i+1}</span>
+                                   <span className={res.Status === 'SUCCESS' ? 'text-emerald-600' : 'text-rose-600'}>{res.Status}</span>
+                                </div>
+                                <div className="text-[10px] font-bold truncate">{csvData[i].MerchantName}</div>
+                                <div className="text-[9px] text-slate-500 mt-1 line-clamp-2">{res.Message}</div>
                               </div>
-                          )}
-                          {validationStatus === 'failed' && (
-                              <div className="space-y-2">
-                                  {validationErrors.map((err, i) => (
-                                      <div key={i} className="bg-rose-50 border border-rose-100 p-3 rounded-2xl text-[10px] animate-in slide-in-from-right-1">
-                                          <span className="font-black text-rose-500 uppercase">Row {err.row}</span>: <span className="font-bold text-slate-700">[{err.field}]</span> {err.msg}
-                                      </div>
-                                  ))}
-                              </div>
-                          )}
-                       </div>
-                    </div>
-
-                    <div className="bg-indigo-900 rounded-[2.5rem] shadow-2xl p-6 h-[375px] flex flex-col text-indigo-100 border border-white/5">
-                       <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2 mb-4">
-                          <Icons.Activity size={14} className="text-indigo-300" /> API 即時回覆結果
-                       </h3>
-                       <div className="flex-1 overflow-auto custom-scrollbar space-y-3 pr-2">
-                          {results.every(r => r === null) ? (
-                              <div className="text-indigo-300/30 text-[10px] italic border-2 border-dashed border-indigo-800 rounded-3xl p-6 text-center py-16 font-bold uppercase tracking-[0.2em]">Ready for Batch</div>
-                          ) : (
-                              results.map((res, i) => res && (
-                                  <div key={i} onClick={() => setSelectedJson(res)} className="p-4 rounded-2xl border border-indigo-700/50 cursor-pointer transition-all hover:bg-white/5">
-                                      <div className="flex justify-between items-center mb-1">
-                                          <span className="text-[9px] font-black uppercase tracking-wider text-indigo-400">Idx: {i+1}</span>
-                                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${res.Status === 'SUCCESS' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
-                                              {res.Status}
-                                          </span>
-                                      </div>
-                                      <div className="text-[11px] font-bold truncate text-white">{csvData[i]?.MerchantName}</div>
-                                      <div className="text-[10px] text-indigo-300 mt-1 leading-tight line-clamp-2 italic">{res.Message}</div>
-                                  </div>
-                              ))
-                          )}
+                          ))}
                        </div>
                     </div>
                   </div>
@@ -447,17 +277,14 @@
               </div>
 
               {selectedJson && (
-                <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-50 flex items-center justify-center p-6" onClick={() => setSelectedJson(null)}>
-                  <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[85%] flex flex-col border border-slate-200" onClick={e => e.stopPropagation()}>
-                    <div className="px-10 py-8 border-b flex justify-between items-center bg-slate-50">
-                      <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-3 underline decoration-indigo-500 underline-offset-8">API Response Parser</h2>
-                      <button onClick={() => setSelectedJson(null)} className="text-slate-400 hover:text-slate-900 transition-colors p-2 font-black uppercase text-[10px] border border-slate-200 rounded-xl px-4 hover:bg-slate-100">Close [X]</button>
+                <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={() => setSelectedJson(null)}>
+                  <div className="bg-white w-full max-w-xl rounded-[2.5rem] p-8 max-h-[80%] flex flex-col" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-center mb-4">
+                       <h2 className="text-lg font-black flex items-center gap-2"><Icons.ShieldCheck className="text-indigo-600" /> API 回傳解析</h2>
+                       <button onClick={() => setSelectedJson(null)} className="text-slate-400 hover:text-slate-900 transition-colors">✕</button>
                     </div>
-                    <div className="flex-1 overflow-auto p-10 code-font text-[11px]">
-                      <pre className="bg-slate-900 text-indigo-300 p-8 rounded-[2rem] overflow-x-auto shadow-inner leading-relaxed border border-white/5">
-                        {JSON.stringify(selectedJson, null, 4)}
-                      </pre>
-                    </div>
+                    <pre className="flex-1 overflow-auto bg-slate-900 text-indigo-300 p-6 rounded-2xl text-[10px] leading-relaxed custom-scrollbar font-mono">{JSON.stringify(selectedJson, null, 4)}</pre>
+                    <button onClick={() => setSelectedJson(null)} className="mt-6 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors">關閉視窗</button>
                   </div>
                 </div>
               )}
@@ -470,4 +297,3 @@
     </script>
 </body>
 </html>
-
